@@ -6,16 +6,18 @@ mud-project/
 │   └── server/          # Main application entry point
 │       └── main.go
 ├── internal/            # Private application code
-│   ├── auth/           # Authentication logic
-│   ├── database/       # Database layer
-│   ├── game/           # Game logic, rooms, commands
-│   ├── player/         # Player management
-│   └── websocket/      # WebSocket handling
+│   ├── auth/            # Authentication logic
+│   ├── config/          # Configuration module
+│       └── config.go
+│   ├── database/        # Database layer
+│   ├── game/            # Game logic, rooms, commands
+│   ├── player/          # Player management
+│   └── websocket/       # WebSocket handling
 ├── web/
-│   └── static/         # HTML/CSS/JS for web client
-├── data/               # SQLite database files, configs
-├── go.mod              # Go module dependencies
-└── go.sum              # Dependency checksums
+│   └── static/          # HTML/CSS/JS for web client
+├── data/                # SQLite database files, configs
+├── go.mod               # Go module dependencies
+└── go.sum               # Dependency checksums
 ```
 
 ## Essential Go Packages
