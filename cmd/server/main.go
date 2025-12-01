@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"mudengine/internal/config"
 )
 
 // AuthState represents the current authentication state of a connection
@@ -375,7 +376,17 @@ const (
 )
 
 func main() {
-	log.Printf("%s v%s starting up...", ServerName, ServerVersion)
+	// Load configuration from .env file
+	// Use -env flag to specify custom file: go run main.go -env custom.env
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+	
+	// Log configuration
+	cfg.LogConfig()
+	
+	log.Printf("%s v%s starting up...", cfg.ServerName, cfg.ServerVersion)
 	
 	server := NewServer()
 	go server.Run()
@@ -391,7 +402,7 @@ func main() {
 
 	// Create HTTP server with timeouts
 	httpServer := &http.Server{
-		Addr:         ":8080",
+		Addr:         fmt.Sprintf(":%d", cfg.ServerPort),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -403,9 +414,9 @@ func main() {
 
 	// Start HTTP server in a goroutine
 	go func() {
-		log.Printf("%s v%s ready", ServerName, ServerVersion)
-		log.Println("WebSocket endpoint: ws://localhost:8080/ws")
-		log.Println("Web client: http://localhost:8080/")
+		log.Printf("%s v%s ready", cfg.ServerName, cfg.ServerVersion)
+		log.Printf("WebSocket endpoint: ws://localhost:%d/ws", cfg.ServerPort)
+		log.Printf("Web client: http://localhost:%d/", cfg.ServerPort)
 		log.Println("Press Ctrl+C to shutdown")
 		
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -416,16 +427,16 @@ func main() {
 	// Wait for shutdown signal
 	sig := <-sigChan
 	log.Printf("\nReceived signal: %v", sig)
-	performGracefulShutdown(server, httpServer)
+	performGracefulShutdown(server, httpServer, cfg)
 }
 
 // performGracefulShutdown handles the shutdown sequence
-func performGracefulShutdown(server *Server, httpServer *http.Server) {
-	log.Printf("%s v%s shutting down...", ServerName, ServerVersion)
+func performGracefulShutdown(server *Server, httpServer *http.Server, cfg *config.Config) {
+	log.Printf("%s v%s shutting down...", cfg.ServerName, cfg.ServerVersion)
 	
 	// Step 1: Stop accepting new connections
 	log.Println("[1/5] Stopping new connections...")
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.ShutdownTimeoutSecs)*time.Second)
 	defer cancel()
 	
 	// Step 2: Notify all connected players
@@ -450,7 +461,7 @@ func performGracefulShutdown(server *Server, httpServer *http.Server) {
 		log.Printf("HTTP server shutdown error: %v", err)
 	}
 	
-	log.Printf("%s v%s offline.", ServerName, ServerVersion)
+	log.Printf("%s v%s offline.", cfg.ServerName, cfg.ServerVersion)
 }
 
 // saveAllPlayerData saves all connected players' current state
