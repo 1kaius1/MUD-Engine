@@ -1,0 +1,214 @@
+/* CSS Custom Properties for user preferences */
+:root {
+    --terminal-font-size: 14px;
+    --terminal-line-height: 1.0;
+}
+
+/* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Courier New', Courier, monospace;
+    background-color: #000000;
+    color: #00ff00;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    line-height: 1.2;
+}
+
+/* Terminal display area */
+#terminal {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 20px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    background-color: #000000;
+    border: 2px solid #00ff00;
+    margin: 10px;
+    line-height: 1.0;
+    font-size: 14px;
+}
+
+/* Input container */
+#input-container {
+    display: flex;
+    padding: 10px;
+    background-color: #111111;
+    border-top: 2px solid #00ff00;
+    gap: 10px;
+}
+
+/* Input field */
+#input {
+    flex: 1;
+    background-color: #000000;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+    padding: 10px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 14px;
+}
+
+#input:focus {
+    outline: none;
+    border-color: #00ffff;
+    box-shadow: 0 0 5px #00ffff;
+}
+
+/* Status bar */
+#status {
+    padding: 8px 10px;
+    text-align: center;
+    background-color: #111111;
+    border-top: 1px solid #00ff00;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+/* Status colors */
+.connected {
+    color: #00ff00;
+}
+
+.disconnected {
+    color: #ff0000;
+}
+
+.connecting {
+    color: #ffff00;
+}
+
+.reconnecting {
+    color: #ff9900;
+}
+
+/* Scrollbar styling for webkit browsers */
+#terminal::-webkit-scrollbar {
+    width: 12px;
+}
+
+#terminal::-webkit-scrollbar-track {
+    background: #000000;
+    border: 1px solid #00ff00;
+}
+
+#terminal::-webkit-scrollbar-thumb {
+    background: #00ff00;
+    border-radius: 6px;
+}
+
+#terminal::-webkit-scrollbar-thumb:hover {
+    background: #00ffff;
+}
+
+/* Firefox scrollbar styling */
+#terminal {
+    scrollbar-width: thin;
+    scrollbar-color: #00ff00 #000000;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 768px) {
+    #terminal {
+        padding: 10px;
+        margin: 5px;
+        font-size: 12px;
+    }
+    
+    #input {
+        font-size: 16px; /* Prevent zoom on iOS */
+        padding: 12px;
+    }
+    
+    #status {
+        font-size: 11px;
+    }
+}
+
+/* Tablet styles */
+@media (min-width: 769px) and (max-width: 1024px) {
+    #terminal {
+        padding: 15px;
+        margin: 8px;
+    }
+}
+
+/* Text selection */
+::selection {
+    background-color: #00ff00;
+    color: #000000;
+}
+
+::-moz-selection {
+    background-color: #00ff00;
+    color: #000000;
+}
+
+/* Password input styling - make it look the same */
+#input[type="password"] {
+    letter-spacing: 0.3em;
+}
+
+/* Command styling for better readability */
+.command {
+    color: #00ffff;
+    font-weight: bold;
+}
+
+.error {
+    color: #ff0000;
+}
+
+.success {
+    color: #00ff00;
+}
+
+.info {
+    color: #ffff00;
+}
+
+/* Loading animation for status */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.connecting, .reconnecting {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Optional: ANSI color classes for future use */
+.ansi-black { color: #000000; }
+.ansi-red { color: #ff0000; }
+.ansi-green { color: #00ff00; }
+.ansi-yellow { color: #ffff00; }
+.ansi-blue { color: #0000ff; }
+.ansi-magenta { color: #ff00ff; }
+.ansi-cyan { color: #00ffff; }
+.ansi-white { color: #ffffff; }
+
+.ansi-bright-black { color: #808080; }
+.ansi-bright-red { color: #ff6060; }
+.ansi-bright-green { color: #60ff60; }
+.ansi-bright-yellow { color: #ffff60; }
+.ansi-bright-blue { color: #6060ff; }
+.ansi-bright-magenta { color: #ff60ff; }
+.ansi-bright-cyan { color: #60ffff; }
+.ansi-bright-white { color: #ffffff; }
+
+.ansi-bold { font-weight: bold; }
+.ansi-dim { opacity: 0.7; }
+.ansi-italic { font-style: italic; }
+.ansi-underline { text-decoration: underline; }

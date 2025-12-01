@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Web-based MUD client using WebSocket connection">
+    <meta name="author" content="MUD Project">
+    
+    <title>MUD Client</title>
+    
+    <!-- Favicon (optional - add later) -->
+    <!-- <link rel="icon" type="image/png" href="favicon.png"> -->
+    
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="client.css">
+</head>
+<body>
+    <!-- Terminal display area -->
+    <div id="terminal" role="log" aria-live="polite" aria-atomic="false"></div>
+    
+    <!-- Input container -->
+    <div id="input-container">
+        <input 
+            type="text" 
+            id="input" 
+            placeholder="Enter command..." 
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            aria-label="Command input"
+        >
+    </div>
+    
+    <!-- Status bar -->
+    <div id="status" class="disconnected" role="status" aria-live="polite">
+        Disconnected
+    </div>
+    
+    <!-- JavaScript -->
+    <script src="client.js"></script>
+</body>
+</html>

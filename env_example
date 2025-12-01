@@ -1,0 +1,53 @@
+# MUD Engine Configuration File
+# This file contains bootstrap configuration for the MUD server
+# It will be automatically created with defaults if missing
+
+# ==============================================================================
+# SERVER SETTINGS
+# ==============================================================================
+SERVER_NAME=MUD Engine
+SERVER_VERSION=0.1.0
+SERVER_PORT=8080
+
+# ==============================================================================
+# DATABASE SETTINGS
+# ==============================================================================
+# DB_TYPE: "sqlite" or "postgres"
+DB_TYPE=sqlite
+
+# For SQLite (single file database)
+# DB_NAME is the path to the database file
+DB_NAME=data/mud.db
+
+# For PostgreSQL (uncomment and configure when migrating)
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_USER=muduser
+# DB_PASSWORD=your_secure_password_here
+
+# Database connection pool settings
+DB_MAX_CONNECTIONS=25
+DB_MAX_IDLE_CONNS=5
+
+# ==============================================================================
+# REDIS SETTINGS (Future Use)
+# ==============================================================================
+REDIS_ENABLED=false
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_DB=0
+
+# ==============================================================================
+# SERVER BEHAVIOR
+# ==============================================================================
+MAX_PLAYERS=100
+SHUTDOWN_TIMEOUT_SECS=30
+RECONNECT_ATTEMPTS=5
+SESSION_TIMEOUT_MINS=60
+
+# ==============================================================================
+# TLS/SSL SETTINGS (Future Use)
+# ==============================================================================
+TLS_ENABLED=false
+TLS_CERT_FILE=certs/server.crt
+TLS_KEY_FILE=certs/server.key

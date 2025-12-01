@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Enter a world of text-based adventure">
+    <title>MUD Engine - A Text-Based Game Engine</title>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <!-- Navigation Bar -->
+    <nav class="navbar">
+        <div class="navbar-left">
+            <!-- Enter the World Dropdown -->
+            <div class="enter-world">
+                <button class="enter-world-btn" onclick="toggleDropdown()">
+                    Enter the World ▼
+                </button>
+                <div class="dropdown-menu" id="enterDropdown">
+                    <a href="#" class="dropdown-item" onclick="launchDedicatedClient(event)">
+                        Dedicated Client
+                    </a>
+                    <a href="client.html" class="dropdown-item">
+                        Web Client
+                    </a>
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <ul class="nav-links">
+                <li><a href="#world" class="nav-link">The World</a></li>
+                <li><a href="#game" class="nav-link">The Game</a></li>
+                <li><a href="#staff" class="nav-link">The Staff</a></li>
+            </ul>
+        </div>
+
+        <!-- User Menu -->
+        <div class="navbar-right">
+            <div class="user-menu">
+                <button class="user-btn" onclick="toggleUserMenu()" id="userBtn">
+                    Login
+                </button>
+                <div class="dropdown-menu" id="userDropdown">
+                    <a href="#profile" class="dropdown-item">My Profile</a>
+                    <a href="#settings" class="dropdown-item">Settings</a>
+                    <a href="#characters" class="dropdown-item">Characters</a>
+                    <a href="#logout" class="dropdown-item" onclick="logout(event)">Logout</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <main class="hero">
+        <h1 class="hero-title">Welcome, Adventurer</h1>
+        <p class="hero-subtitle">
+            A World of Text-Based Adventure Awaits
+        </p>
+        <p class="hero-description">
+            Immerse yourself in a rich, interactive world where your imagination 
+            is the only limit. Explore vast lands, meet fascinating characters, 
+            battle fearsome creatures, and forge your own legend in this 
+            classic text-based adventure experience.
+        </p>
+        <a href="client.html" class="cta-button">
+            Begin Your Journey
+        </a>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>&copy; 2025 Stygian Forge. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // Toggle Enter the World dropdown
+        function toggleDropdown() {
+            const dropdown = document.getElementById('enterDropdown');
+            dropdown.classList.toggle('show');
+            
+            // Close user dropdown if open
+            document.getElementById('userDropdown').classList.remove('show');
+        }
+
+        // Toggle User Menu dropdown
+        function toggleUserMenu() {
+            const dropdown = document.getElementById('userDropdown');
+            dropdown.classList.toggle('show');
+            
+            // Close enter dropdown if open
+            document.getElementById('enterDropdown').classList.remove('show');
+        }
+
+        // Close dropdowns when clicking outside
+        window.onclick = function(event) {
+            if (!event.target.matches('.enter-world-btn') && 
+                !event.target.matches('.user-btn')) {
+                const dropdowns = document.getElementsByClassName('dropdown-menu');
+                for (let i = 0; i < dropdowns.length; i++) {
+                    dropdowns[i].classList.remove('show');
+                }
+            }
+        }
+
+        // Launch dedicated client (placeholder)
+        function launchDedicatedClient(event) {
+            event.preventDefault();
+            alert('Dedicated client download coming soon!\n\nFor now, please use the Web Client.');
+        }
+
+        // Logout function (placeholder)
+        function logout(event) {
+            event.preventDefault();
+            // TODO: Clear user session
+            document.getElementById('userBtn').textContent = 'Login';
+            document.getElementById('userDropdown').classList.remove('show');
+            alert('Logged out successfully.');
+        }
+
+        // Check if user is logged in (placeholder)
+        // TODO: Implement actual session management
+        function checkUserSession() {
+            // This would check localStorage, cookies, or session storage
+            const username = localStorage.getItem('username');
+            if (username) {
+                document.getElementById('userBtn').textContent = username;
+            }
+        }
+
+        // Check session on page load
+        window.addEventListener('DOMContentLoaded', checkUserSession);
+    </script>
+</body>
+</html>
+
