@@ -45,6 +45,9 @@ go get github.com/redis/go-redis/v9
 
 # SQLite3 support
 go get github.com/mattn/go-sqlite3
+
+# Install UUID package
+go get github.com/google/uuid
 ```
 
 ## Helpful development tools
