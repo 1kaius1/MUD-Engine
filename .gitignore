@@ -7,6 +7,8 @@
 *.dll
 *.so
 *.dylib
+cmd/server/server
+cmd/server/main
 
 # Test binary, built with `go test -c`
 *.test
@@ -24,9 +26,37 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
+# Environment and secrets
 .env
+*.env
+
+# Database files
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# TLS certificates and keys
+certs/
+*.pem
+*.key
+*.crt
+
+# Compiled static files (if generated them)
+web/static/bundle.*
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
