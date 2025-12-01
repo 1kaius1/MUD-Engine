@@ -42,6 +42,9 @@ go get github.com/joho/godotenv
 
 # Redis client (for later)
 go get github.com/redis/go-redis/v9
+
+# SQLite3 support
+go get github.com/mattn/go-sqlite3
 ```
 
 ## Helpful development tools
