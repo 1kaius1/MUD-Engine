@@ -1,3 +1,6 @@
+// File: internal/game/commands.go
+// MUD Engine - Command System
+
 package game
 
 import (
@@ -28,6 +31,7 @@ type CommandRegistry struct {
 var Registry *CommandRegistry
 
 // InitializeCommands sets up the global command registry
+// This must be called once at server startup
 func InitializeCommands() {
 	Registry = NewCommandRegistry()
 }

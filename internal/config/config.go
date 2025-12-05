@@ -1,3 +1,6 @@
+// File: internal/config/config.go
+// MUD Engine - Configuration Management
+
 package config
 
 import (
@@ -16,7 +19,7 @@ type Config struct {
 	ServerName    string
 	ServerVersion string
 	ServerPort    int
-
+	
 	// Database settings
 	DBType           string // "sqlite" or "postgres"
 	DBHost           string // For PostgreSQL
@@ -26,19 +29,19 @@ type Config struct {
 	DBPassword       string // For PostgreSQL
 	DBMaxConnections int
 	DBMaxIdleConns   int
-
+	
 	// Redis settings (for future use)
 	RedisEnabled bool
 	RedisHost    string
 	RedisPort    int
 	RedisDB      int
-
+	
 	// Server behavior
-	MaxPlayers          int
-	ShutdownTimeoutSecs int
-	ReconnectAttempts   int
-	SessionTimeoutMins  int
-
+	MaxPlayers           int
+	ShutdownTimeoutSecs  int
+	ReconnectAttempts    int
+	SessionTimeoutMins   int
+	
 	// TLS settings (for future use)
 	TLSEnabled  bool
 	TLSCertFile string
@@ -47,28 +50,28 @@ type Config struct {
 
 // Default configuration values
 var defaultConfig = Config{
-	ServerName:          "MUD Engine",
-	ServerVersion:       "0.1.0",
-	ServerPort:          8080,
-	DBType:              "sqlite",
-	DBHost:              "localhost",
-	DBPort:              5432,
-	DBName:              "data/mud.db",
-	DBUser:              "muduser",
-	DBPassword:          "",
-	DBMaxConnections:    25,
-	DBMaxIdleConns:      5,
-	RedisEnabled:        false,
-	RedisHost:           "localhost",
-	RedisPort:           6379,
-	RedisDB:             0,
-	MaxPlayers:          100,
-	ShutdownTimeoutSecs: 30,
-	ReconnectAttempts:   5,
-	SessionTimeoutMins:  60,
-	TLSEnabled:          false,
-	TLSCertFile:         "certs/server.crt",
-	TLSKeyFile:          "certs/server.key",
+	ServerName:           "MUD Engine",
+	ServerVersion:        "0.1.0",
+	ServerPort:           8080,
+	DBType:               "sqlite",
+	DBHost:               "localhost",
+	DBPort:               5432,
+	DBName:               "data/mud.db",
+	DBUser:               "muduser",
+	DBPassword:           "",
+	DBMaxConnections:     25,
+	DBMaxIdleConns:       5,
+	RedisEnabled:         false,
+	RedisHost:            "localhost",
+	RedisPort:            6379,
+	RedisDB:              0,
+	MaxPlayers:           100,
+	ShutdownTimeoutSecs:  30,
+	ReconnectAttempts:    5,
+	SessionTimeoutMins:   60,
+	TLSEnabled:           false,
+	TLSCertFile:          "certs/server.crt",
+	TLSKeyFile:           "certs/server.key",
 }
 
 // LoadConfig loads configuration from environment file
@@ -77,12 +80,12 @@ func LoadConfig() (*Config, error) {
 	// Parse command line flags
 	envFile := flag.String("env", ".env", "Path to environment configuration file")
 	flag.Parse()
-
+	
 	log.Printf("Loading configuration from: %s", *envFile)
-
+	
 	// Start with default config
 	config := defaultConfig
-
+	
 	// Try to load from .env file
 	if err := loadEnvFile(*envFile, &config); err != nil {
 		if os.IsNotExist(err) {
@@ -95,12 +98,12 @@ func LoadConfig() (*Config, error) {
 			return nil, fmt.Errorf("failed to load config: %w", err)
 		}
 	}
-
+	
 	// Validate configuration
 	if err := validateConfig(&config); err != nil {
 		return nil, fmt.Errorf("invalid configuration: %w", err)
 	}
-
+	
 	log.Println("Configuration loaded successfully")
 	return &config, nil
 }
@@ -112,38 +115,38 @@ func loadEnvFile(filename string, config *Config) error {
 		return err
 	}
 	defer file.Close()
-
+	
 	scanner := bufio.NewScanner(file)
 	lineNum := 0
-
+	
 	for scanner.Scan() {
 		lineNum++
 		line := strings.TrimSpace(scanner.Text())
-
+		
 		// Skip empty lines and comments
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-
+		
 		// Parse key=value pairs
 		parts := strings.SplitN(line, "=", 2)
 		if len(parts) != 2 {
 			log.Printf("Warning: Invalid line %d in %s: %s", lineNum, filename, line)
 			continue
 		}
-
+		
 		key := strings.TrimSpace(parts[0])
 		value := strings.TrimSpace(parts[1])
-
+		
 		// Remove quotes if present
 		value = strings.Trim(value, "\"'")
-
+		
 		// Set configuration value
 		if err := setConfigValue(config, key, value); err != nil {
 			log.Printf("Warning: Error setting %s on line %d: %v", key, lineNum, err)
 		}
 	}
-
+	
 	return scanner.Err()
 }
 
@@ -161,7 +164,7 @@ func setConfigValue(config *Config, key, value string) error {
 			return err
 		}
 		config.ServerPort = port
-
+		
 	// Database settings
 	case "DB_TYPE":
 		config.DBType = value
@@ -191,7 +194,7 @@ func setConfigValue(config *Config, key, value string) error {
 			return err
 		}
 		config.DBMaxIdleConns = max
-
+		
 	// Redis settings
 	case "REDIS_ENABLED":
 		config.RedisEnabled = value == "true" || value == "1"
@@ -209,7 +212,7 @@ func setConfigValue(config *Config, key, value string) error {
 			return err
 		}
 		config.RedisDB = db
-
+		
 	// Server behavior
 	case "MAX_PLAYERS":
 		max, err := strconv.Atoi(value)
@@ -235,7 +238,7 @@ func setConfigValue(config *Config, key, value string) error {
 			return err
 		}
 		config.SessionTimeoutMins = timeout
-
+		
 	// TLS settings
 	case "TLS_ENABLED":
 		config.TLSEnabled = value == "true" || value == "1"
@@ -243,12 +246,12 @@ func setConfigValue(config *Config, key, value string) error {
 		config.TLSCertFile = value
 	case "TLS_KEY_FILE":
 		config.TLSKeyFile = value
-
+		
 	default:
 		// Unknown key - just log it
 		log.Printf("Warning: Unknown configuration key: %s", key)
 	}
-
+	
 	return nil
 }
 
@@ -307,10 +310,8 @@ SESSION_TIMEOUT_MINS=60
 TLS_ENABLED=false
 TLS_CERT_FILE=certs/server.crt
 TLS_KEY_FILE=certs/server.key
-
-
 `
-
+	
 	return os.WriteFile(filename, []byte(content), 0644)
 }
 
@@ -319,15 +320,15 @@ func validateConfig(config *Config) error {
 	if config.ServerPort < 1 || config.ServerPort > 65535 {
 		return fmt.Errorf("invalid SERVER_PORT: must be between 1 and 65535")
 	}
-
+	
 	if config.DBType != "sqlite" && config.DBType != "postgres" {
 		return fmt.Errorf("invalid DB_TYPE: must be 'sqlite' or 'postgres'")
 	}
-
+	
 	if config.DBName == "" {
 		return fmt.Errorf("DB_NAME cannot be empty")
 	}
-
+	
 	if config.DBType == "postgres" {
 		if config.DBHost == "" {
 			return fmt.Errorf("DB_HOST required for PostgreSQL")
@@ -336,15 +337,15 @@ func validateConfig(config *Config) error {
 			return fmt.Errorf("DB_USER required for PostgreSQL")
 		}
 	}
-
+	
 	if config.MaxPlayers < 1 {
 		return fmt.Errorf("MAX_PLAYERS must be at least 1")
 	}
-
+	
 	if config.ShutdownTimeoutSecs < 5 {
 		return fmt.Errorf("SHUTDOWN_TIMEOUT_SECS must be at least 5 seconds")
 	}
-
+	
 	return nil
 }
 

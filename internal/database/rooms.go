@@ -1,3 +1,6 @@
+// File: internal/database/rooms.go
+// MUD Engine - Room CRUD Operations
+
 package database
 
 import (
@@ -11,35 +14,35 @@ import (
 
 // Room represents a room in the game world
 type Room struct {
-	ID          string `json:"id"`
-	ZoneID      string `json:"zone_id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	Terrain     string `json:"terrain"`
-	Darkness    int    `json:"darkness"`
-
+	ID          string    `json:"id"`
+	ZoneID      string    `json:"zone_id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Terrain     string    `json:"terrain"`
+	Darkness    int       `json:"darkness"`
+	
 	// Flags
 	BlocksMagic       bool `json:"blocks_magic"`
 	RestrictsMovement bool `json:"restricts_movement"`
 	NoTeleportIn      bool `json:"no_teleport_in"`
 	NoTeleportOut     bool `json:"no_teleport_out"`
-
+	
 	// Traps
 	HasTrap          bool `json:"has_trap"`
 	TrapDamage       int  `json:"trap_damage"`
 	TrapTickInterval int  `json:"trap_tick_interval"`
-
+	
 	// Status effects
 	Status string `json:"status"`
-
+	
 	// Metadata
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
-
+	
 	// Runtime data (loaded separately)
-	Exits    []*Exit  `json:"exits,omitempty"`
-	Objects  []string `json:"objects,omitempty"`  // Object IDs
-	Entities []string `json:"entities,omitempty"` // Entity IDs
+	Exits   []*Exit   `json:"exits,omitempty"`
+	Objects []string  `json:"objects,omitempty"`   // Object IDs
+	Entities []string `json:"entities,omitempty"`  // Entity IDs
 }
 
 // Exit represents a connection between rooms
@@ -73,12 +76,12 @@ func CreateRoom(room *Room) error {
 	if room.ID == "" {
 		room.ID = uuid.New().String()
 	}
-
+	
 	// Set timestamps
 	now := time.Now()
 	room.CreatedAt = now
 	room.UpdatedAt = now
-
+	
 	query := `
 		INSERT INTO rooms (
 			id, zone_id, title, description, terrain, darkness,
@@ -87,25 +90,25 @@ func CreateRoom(room *Room) error {
 			created_at, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-
+	
 	_, err := DB.Exec(query,
 		room.ID, room.ZoneID, room.Title, room.Description, room.Terrain, room.Darkness,
 		room.BlocksMagic, room.RestrictsMovement, room.NoTeleportIn, room.NoTeleportOut,
 		room.HasTrap, room.TrapDamage, room.TrapTickInterval, room.Status,
 		room.CreatedAt, room.UpdatedAt,
 	)
-
+	
 	if err != nil {
 		return fmt.Errorf("failed to create room: %w", err)
 	}
-
+	
 	return nil
 }
 
 // GetRoom retrieves a room by ID
 func GetRoom(id string) (*Room, error) {
 	room := &Room{}
-
+	
 	query := `
 		SELECT 
 			id, zone_id, title, description, terrain, darkness,
@@ -115,28 +118,28 @@ func GetRoom(id string) (*Room, error) {
 		FROM rooms
 		WHERE id = ?
 	`
-
+	
 	err := DB.QueryRow(query, id).Scan(
 		&room.ID, &room.ZoneID, &room.Title, &room.Description, &room.Terrain, &room.Darkness,
 		&room.BlocksMagic, &room.RestrictsMovement, &room.NoTeleportIn, &room.NoTeleportOut,
 		&room.HasTrap, &room.TrapDamage, &room.TrapTickInterval, &room.Status,
 		&room.CreatedAt, &room.UpdatedAt,
 	)
-
+	
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("room not found: %s", id)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get room: %w", err)
 	}
-
+	
 	// Load exits for this room
 	exits, err := GetExitsByRoom(id)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load exits: %w", err)
 	}
 	room.Exits = exits
-
+	
 	return room, nil
 }
 
@@ -152,13 +155,13 @@ func GetRoomsByZone(zoneID string) ([]*Room, error) {
 		WHERE zone_id = ?
 		ORDER BY title
 	`
-
+	
 	rows, err := DB.Query(query, zoneID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query rooms: %w", err)
 	}
 	defer rows.Close()
-
+	
 	var rooms []*Room
 	for rows.Next() {
 		room := &Room{}
@@ -173,14 +176,14 @@ func GetRoomsByZone(zoneID string) ([]*Room, error) {
 		}
 		rooms = append(rooms, room)
 	}
-
+	
 	return rooms, nil
 }
 
 // UpdateRoom updates an existing room
 func UpdateRoom(room *Room) error {
 	room.UpdatedAt = time.Now()
-
+	
 	query := `
 		UPDATE rooms SET
 			zone_id = ?, title = ?, description = ?, terrain = ?, darkness = ?,
@@ -189,27 +192,27 @@ func UpdateRoom(room *Room) error {
 			updated_at = ?
 		WHERE id = ?
 	`
-
+	
 	result, err := DB.Exec(query,
 		room.ZoneID, room.Title, room.Description, room.Terrain, room.Darkness,
 		room.BlocksMagic, room.RestrictsMovement, room.NoTeleportIn, room.NoTeleportOut,
 		room.HasTrap, room.TrapDamage, room.TrapTickInterval, room.Status,
 		room.UpdatedAt, room.ID,
 	)
-
+	
 	if err != nil {
 		return fmt.Errorf("failed to update room: %w", err)
 	}
-
+	
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
-
+	
 	if rowsAffected == 0 {
 		return fmt.Errorf("room not found: %s", room.ID)
 	}
-
+	
 	return nil
 }
 
@@ -220,22 +223,22 @@ func DeleteRoom(id string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete room exits: %w", err)
 	}
-
+	
 	// Delete the room
 	result, err := DB.Exec("DELETE FROM rooms WHERE id = ?", id)
 	if err != nil {
 		return fmt.Errorf("failed to delete room: %w", err)
 	}
-
+	
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
-
+	
 	if rowsAffected == 0 {
 		return fmt.Errorf("room not found: %s", id)
 	}
-
+	
 	return nil
 }
 
@@ -250,13 +253,13 @@ func GetAllRooms() ([]*Room, error) {
 		FROM rooms
 		ORDER BY title
 	`
-
+	
 	rows, err := DB.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query rooms: %w", err)
 	}
 	defer rows.Close()
-
+	
 	var rooms []*Room
 	for rows.Next() {
 		room := &Room{}
@@ -271,7 +274,7 @@ func GetAllRooms() ([]*Room, error) {
 		}
 		rooms = append(rooms, room)
 	}
-
+	
 	return rooms, nil
 }
 
@@ -281,13 +284,13 @@ func CreateExit(exit *Exit) error {
 	if exit.ID == "" {
 		exit.ID = uuid.New().String()
 	}
-
+	
 	// Marshal keywords to JSON
 	keywordsJSON, err := json.Marshal(exit.Keywords)
 	if err != nil {
 		return fmt.Errorf("failed to marshal keywords: %w", err)
 	}
-
+	
 	query := `
 		INSERT INTO exits (
 			id, from_room_id, to_room_id, keywords, description,
@@ -295,17 +298,17 @@ func CreateExit(exit *Exit) error {
 			requires_item_id
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
-
+	
 	_, err = DB.Exec(query,
 		exit.ID, exit.FromRoomID, exit.ToRoomID, string(keywordsJSON), exit.Description,
 		exit.IsHidden, exit.IsObvious, exit.AllowLookThrough, exit.IsOpen, exit.IsLocked,
 		exit.RequiresItemID,
 	)
-
+	
 	if err != nil {
 		return fmt.Errorf("failed to create exit: %w", err)
 	}
-
+	
 	return nil
 }
 
@@ -319,19 +322,19 @@ func GetExitsByRoom(roomID string) ([]*Exit, error) {
 		FROM exits
 		WHERE from_room_id = ?
 	`
-
+	
 	rows, err := DB.Query(query, roomID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query exits: %w", err)
 	}
 	defer rows.Close()
-
+	
 	var exits []*Exit
 	for rows.Next() {
 		exit := &Exit{}
 		var keywordsJSON string
 		var requiresItemID sql.NullString
-
+		
 		err := rows.Scan(
 			&exit.ID, &exit.FromRoomID, &exit.ToRoomID, &keywordsJSON, &exit.Description,
 			&exit.IsHidden, &exit.IsObvious, &exit.AllowLookThrough, &exit.IsOpen, &exit.IsLocked,
@@ -340,20 +343,20 @@ func GetExitsByRoom(roomID string) ([]*Exit, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan exit: %w", err)
 		}
-
+		
 		// Unmarshal keywords
 		if err := json.Unmarshal([]byte(keywordsJSON), &exit.Keywords); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal keywords: %w", err)
 		}
-
+		
 		// Handle nullable requires_item_id
 		if requiresItemID.Valid {
 			exit.RequiresItemID = &requiresItemID.String
 		}
-
+		
 		exits = append(exits, exit)
 	}
-
+	
 	return exits, nil
 }
 
@@ -363,16 +366,16 @@ func DeleteExit(id string) error {
 	if err != nil {
 		return fmt.Errorf("failed to delete exit: %w", err)
 	}
-
+	
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
 		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
-
+	
 	if rowsAffected == 0 {
 		return fmt.Errorf("exit not found: %s", id)
 	}
-
+	
 	return nil
 }
 
@@ -381,54 +384,54 @@ func CreateZone(zone *Zone) error {
 	if zone.ID == "" {
 		zone.ID = uuid.New().String()
 	}
-
+	
 	now := time.Now()
 	zone.CreatedAt = now
 	zone.UpdatedAt = now
-
+	
 	query := `
 		INSERT INTO zones (id, name, description, theme, created_at, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?)
 	`
-
+	
 	_, err := DB.Exec(query, zone.ID, zone.Name, zone.Description, zone.Theme, zone.CreatedAt, zone.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("failed to create zone: %w", err)
 	}
-
+	
 	return nil
 }
 
 // GetZone retrieves a zone by ID
 func GetZone(id string) (*Zone, error) {
 	zone := &Zone{}
-
+	
 	query := "SELECT id, name, description, theme, created_at, updated_at FROM zones WHERE id = ?"
-
+	
 	err := DB.QueryRow(query, id).Scan(
 		&zone.ID, &zone.Name, &zone.Description, &zone.Theme, &zone.CreatedAt, &zone.UpdatedAt,
 	)
-
+	
 	if err == sql.ErrNoRows {
 		return nil, fmt.Errorf("zone not found: %s", id)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get zone: %w", err)
 	}
-
+	
 	return zone, nil
 }
 
 // GetAllZones retrieves all zones
 func GetAllZones() ([]*Zone, error) {
 	query := "SELECT id, name, description, theme, created_at, updated_at FROM zones ORDER BY name"
-
+	
 	rows, err := DB.Query(query)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query zones: %w", err)
 	}
 	defer rows.Close()
-
+	
 	var zones []*Zone
 	for rows.Next() {
 		zone := &Zone{}
@@ -438,6 +441,6 @@ func GetAllZones() ([]*Zone, error) {
 		}
 		zones = append(zones, zone)
 	}
-
+	
 	return zones, nil
 }

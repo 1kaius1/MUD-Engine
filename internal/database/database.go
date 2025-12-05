@@ -1,3 +1,6 @@
+// File: internal/database/database.go
+// MUD Engine - Database Connection Manager
+
 package database
 
 import (
@@ -7,9 +10,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"mudengine/internal/config"
-
 	_ "github.com/mattn/go-sqlite3" // SQLite driver
+	"mudengine/internal/config"
 )
 
 // DB is the global database connection
@@ -20,7 +22,7 @@ func Initialize(cfg *config.Config) error {
 	log.Println("Initializing database connection...")
 
 	var err error
-
+	
 	switch cfg.DBType {
 	case "sqlite":
 		err = initializeSQLite(cfg)
@@ -29,28 +31,28 @@ func Initialize(cfg *config.Config) error {
 	default:
 		return fmt.Errorf("unsupported database type: %s", cfg.DBType)
 	}
-
+	
 	if err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
-
+	
 	// Test the connection
 	if err := DB.Ping(); err != nil {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
-
+	
 	// Set connection pool settings
 	DB.SetMaxOpenConns(cfg.DBMaxConnections)
 	DB.SetMaxIdleConns(cfg.DBMaxIdleConns)
-
+	
 	log.Printf("Database connection established (%s)", cfg.DBType)
-
+	
 	// Check if database needs initialization
 	needsInit, err := needsInitialization()
 	if err != nil {
 		return fmt.Errorf("failed to check initialization status: %w", err)
 	}
-
+	
 	if needsInit {
 		log.Println("Database appears to be new, initializing schema...")
 		if err := initializeSchema(); err != nil {
@@ -60,7 +62,7 @@ func Initialize(cfg *config.Config) error {
 	} else {
 		log.Println("Database schema already exists")
 	}
-
+	
 	return nil
 }
 
@@ -73,24 +75,24 @@ func initializeSQLite(cfg *config.Config) error {
 			return fmt.Errorf("failed to create database directory: %w", err)
 		}
 	}
-
+	
 	// Open database connection
 	var err error
 	DB, err = sql.Open("sqlite3", cfg.DBName)
 	if err != nil {
 		return fmt.Errorf("failed to open SQLite database: %w", err)
 	}
-
+	
 	// Enable foreign keys for SQLite
 	if _, err := DB.Exec("PRAGMA foreign_keys = ON"); err != nil {
 		return fmt.Errorf("failed to enable foreign keys: %w", err)
 	}
-
+	
 	// Set SQLite performance options
 	if _, err := DB.Exec("PRAGMA journal_mode = WAL"); err != nil {
 		log.Printf("Warning: failed to set WAL mode: %v", err)
 	}
-
+	
 	return nil
 }
 
@@ -98,14 +100,14 @@ func initializeSQLite(cfg *config.Config) error {
 func initializePostgreSQL(cfg *config.Config) error {
 	// TODO: Implement PostgreSQL connection
 	// This is a placeholder for when we migrate to PostgreSQL
-
+	
 	connStr := cfg.GetConnectionString()
 	var err error
 	DB, err = sql.Open("postgres", connStr)
 	if err != nil {
 		return fmt.Errorf("failed to open PostgreSQL database: %w", err)
 	}
-
+	
 	return nil
 }
 
@@ -117,7 +119,7 @@ func needsInitialization() (bool, error) {
 		SELECT name FROM sqlite_master 
 		WHERE type='table' AND name='zones'
 	`
-
+	
 	err := DB.QueryRow(query).Scan(&tableName)
 	if err == sql.ErrNoRows {
 		// Table doesn't exist, needs initialization
@@ -126,7 +128,7 @@ func needsInitialization() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-
+	
 	// Table exists
 	return false, nil
 }
@@ -135,7 +137,7 @@ func needsInitialization() (bool, error) {
 func initializeSchema() error {
 	// Read and execute the schema SQL
 	// For now, we'll define it inline. Later we can move to a separate file.
-
+	
 	schema := `
 -- Zones/Areas/Districts
 CREATE TABLE IF NOT EXISTS zones (
@@ -262,21 +264,21 @@ CREATE INDEX IF NOT EXISTS idx_players_username ON players(username);
 	if _, err := DB.Exec(schema); err != nil {
 		return fmt.Errorf("failed to create schema: %w", err)
 	}
-
+	
 	log.Println("Database tables created successfully")
-
+	
 	// Insert initial data
 	if err := insertInitialData(); err != nil {
 		return fmt.Errorf("failed to insert initial data: %w", err)
 	}
-
+	
 	return nil
 }
 
 // insertInitialData adds the default zones and rooms
 func insertInitialData() error {
 	log.Println("Inserting initial data...")
-
+	
 	// Insert Staff Area zone
 	_, err := DB.Exec(`
 		INSERT INTO zones (id, name, description, theme) 
@@ -285,7 +287,7 @@ func insertInitialData() error {
 	if err != nil {
 		return fmt.Errorf("failed to insert staff zone: %w", err)
 	}
-
+	
 	// Insert Builder Room (Room 0)
 	_, err = DB.Exec(`
 		INSERT INTO rooms (id, zone_id, title, description, darkness, status)
@@ -300,7 +302,7 @@ func insertInitialData() error {
 	if err != nil {
 		return fmt.Errorf("failed to insert builder room: %w", err)
 	}
-
+	
 	// Insert Starting Area zone
 	_, err = DB.Exec(`
 		INSERT INTO zones (id, name, description, theme)
@@ -309,7 +311,7 @@ func insertInitialData() error {
 	if err != nil {
 		return fmt.Errorf("failed to insert starting zone: %w", err)
 	}
-
+	
 	log.Println("Initial data inserted successfully")
 	return nil
 }

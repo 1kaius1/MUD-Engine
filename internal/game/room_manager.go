@@ -1,3 +1,6 @@
+// File: internal/game/room_manager.go
+// MUD Engine - Room Management System
+
 package game
 
 import (
