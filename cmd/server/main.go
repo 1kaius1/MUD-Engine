@@ -11,10 +11,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/gorilla/websocket"
 	"mudengine/internal/config"
 	"mudengine/internal/database"
-
-	"github.com/gorilla/websocket"
+	"mudengine/internal/game"
 )
 
 // AuthState represents the current authentication state of a connection
@@ -34,6 +34,8 @@ type Client struct {
 	send           chan []byte
 	authState      AuthState
 	username       string
+	playerID       string
+	currentRoomID  string
 	failedAttempts int
 	mu             sync.Mutex
 }
@@ -85,7 +87,7 @@ func (s *Server) Run() {
 				log.Printf("Client disconnected. Total clients: %d", len(s.clients))
 			}
 			s.mu.Unlock()
-
+			
 		case <-s.shutdown:
 			log.Println("Server shutting down, closing all client connections...")
 			s.mu.Lock()
@@ -126,6 +128,10 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 // readPump reads messages from the WebSocket connection
 func (c *Client) readPump(s *Server) {
 	defer func() {
+		// Remove player from room manager on disconnect
+		if c.playerID != "" {
+			game.Manager.RemovePlayer(c.playerID)
+		}
 		s.unregister <- c
 		c.conn.Close()
 	}()
@@ -310,24 +316,25 @@ func (c *Client) handleMFA(code string) {
 
 	c.authState = StateAuthenticated
 	c.sendMessage(fmt.Sprintf("\r\nWelcome back, %s!\r\n\r\n", c.username))
-
-	// TODO: Load player's current room from database
-	// For now, show a default room description
+	
+	// Set player ID (for now, use username - later this will be from database)
+	c.playerID = c.username
+	
+	// TODO: Load player's last room from database
+	// For now, place new players in Builder Room
+	c.currentRoomID = "00000000-0000-0000-0000-000000000000"
+	
+	// Register player in room manager
+	if err := game.Manager.SetPlayerRoom(c.playerID, c.currentRoomID); err != nil {
+		log.Printf("Error setting player room: %v", err)
+		c.currentRoomID = "00000000-0000-0000-0000-000000000000"
+		game.Manager.SetPlayerRoom(c.playerID, c.currentRoomID)
+	}
+	
+	// Send initial room description
 	c.sendInitialLook()
-
+	
 	c.sendMessage("> ")
-}
-
-// sendInitialLook sends the room description when player first logs in
-func (c *Client) sendInitialLook() {
-	// TODO: Replace with actual room data from database
-	// This is placeholder content until we implement the room system
-	c.sendMessage("The Town Square\r\n")
-	c.sendMessage("You stand in the bustling town square. A large fountain dominates\r\n")
-	c.sendMessage("the center, with merchants hawking their wares around its edge.\r\n")
-	c.sendMessage("A weathered wooden sign stands near the fountain.\r\n\r\n")
-	c.sendMessage("Obvious exits: north, south, east\r\n")
-	c.sendMessage("You see: a weathered wooden sign\r\n\r\n")
 }
 
 // handleGameCommand processes authenticated game commands
@@ -357,6 +364,70 @@ func (c *Client) validateMFA(code string) bool {
 	return code == "123456"
 }
 
+// sendInitialLook sends the room description when player first logs in
+func (c *Client) sendInitialLook() {
+	// Get player's current room
+	room, err := game.Manager.GetRoom(c.currentRoomID)
+	if err != nil {
+		c.sendMessage("ERROR: Unable to load your location.\r\n")
+		log.Printf("Failed to load room %s: %v", c.currentRoomID, err)
+		return
+	}
+	
+	// Send room description
+	c.sendRoomDescription(room)
+}
+
+// sendRoomDescription sends a formatted room description to the client
+func (c *Client) sendRoomDescription(room *database.Room) {
+	// Send room title
+	c.sendMessage(fmt.Sprintf("%s\r\n", room.Title))
+	
+	// Send description
+	c.sendMessage(fmt.Sprintf("%s\r\n\r\n", room.Description))
+	
+	// Get obvious exits
+	obviousExits, err := game.Manager.GetObviousExits(room.ID)
+	if err != nil {
+		log.Printf("Error getting exits: %v", err)
+		return
+	}
+	
+	// Format exits
+	if len(obviousExits) > 0 {
+		exitNames := make([]string, 0, len(obviousExits))
+		for _, exit := range obviousExits {
+			// Use first keyword as the display name
+			if len(exit.Keywords) > 0 {
+				exitNames = append(exitNames, exit.Keywords[0])
+			}
+		}
+		
+		if len(exitNames) > 0 {
+			c.sendMessage(fmt.Sprintf("Obvious exits: %s\r\n", joinStrings(exitNames, ", ")))
+		}
+	} else {
+		c.sendMessage("There are no obvious exits.\r\n")
+	}
+	
+	// TODO: Show objects in room
+	// TODO: Show other players/NPCs in room
+	
+	c.sendMessage("\r\n")
+}
+
+// joinStrings joins a slice of strings with a separator
+func joinStrings(strs []string, sep string) string {
+	if len(strs) == 0 {
+		return ""
+	}
+	result := strs[0]
+	for i := 1; i < len(strs); i++ {
+		result += sep + strs[i]
+	}
+	return result
+}
+
 // Shutdown initiates graceful shutdown
 func (s *Server) Shutdown() {
 	close(s.shutdown)
@@ -384,24 +455,29 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
-
+	
 	// Log configuration
 	cfg.LogConfig()
-
+	
 	log.Printf("%s v%s starting up...", cfg.ServerName, cfg.ServerVersion)
-
+	
 	// Initialize database
 	if err := database.Initialize(cfg); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer database.Close()
-
+	
+	// Initialize room manager
+	if err := game.InitializeRoomManager(); err != nil {
+		log.Fatalf("Failed to initialize room manager: %v", err)
+	}
+	
 	server := NewServer()
 	go server.Run()
 
 	// HTTP handlers
 	http.HandleFunc("/ws", server.handleWebSocket)
-
+	
 	// Serve static files for web client
 	// This serves all files from web/static directory
 	// index.html will be served by default for "/"
@@ -426,7 +502,7 @@ func main() {
 		log.Printf("WebSocket endpoint: ws://localhost:%d/ws", cfg.ServerPort)
 		log.Printf("Web client: http://localhost:%d/", cfg.ServerPort)
 		log.Println("Press Ctrl+C to shutdown")
-
+		
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("HTTP server error: %v", err)
 		}
@@ -441,42 +517,40 @@ func main() {
 // performGracefulShutdown handles the shutdown sequence
 func performGracefulShutdown(server *Server, httpServer *http.Server, cfg *config.Config) {
 	log.Printf("%s v%s shutting down...", cfg.ServerName, cfg.ServerVersion)
-
+	
 	// Step 1: Stop accepting new connections
 	log.Println("[1/5] Stopping new connections...")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.ShutdownTimeoutSecs)*time.Second)
 	defer cancel()
-
+	
 	// Step 2: Notify all connected players
 	log.Println("[2/5] Notifying connected players...")
 	server.Shutdown() // This sends messages to clients and closes connections
-
+	
 	// Step 3: Save all player data
 	log.Println("[3/5] Saving player data...")
-	// TODO: Save all authenticated players' locations and status to database
 	saveAllPlayerData(server)
 	time.Sleep(500 * time.Millisecond) // Simulate database writes
-
+	
 	// Step 4: Flush pending database writes
 	log.Println("[4/5] Flushing database writes...")
 	flushDatabaseWrites()
 	time.Sleep(500 * time.Millisecond) // Simulate flush
-
+	
 	// Step 5: Shutdown HTTP server
 	log.Println("[5/5] Shutting down HTTP server...")
 	if err := httpServer.Shutdown(ctx); err != nil {
 		log.Printf("HTTP server shutdown error: %v", err)
 	}
-
+	
 	log.Printf("%s v%s offline.", cfg.ServerName, cfg.ServerVersion)
 }
 
 // saveAllPlayerData saves all connected players' current state
 func saveAllPlayerData(server *Server) {
-	// TODO: Implement when we have database layer
 	server.mu.RLock()
 	defer server.mu.RUnlock()
-
+	
 	playerCount := 0
 	for client := range server.clients {
 		if client.authState == StateAuthenticated {
@@ -486,7 +560,7 @@ func saveAllPlayerData(server *Server) {
 			playerCount++
 		}
 	}
-
+	
 	if playerCount > 0 {
 		log.Printf("  Saved %d player(s)", playerCount)
 	} else {
@@ -521,8 +595,8 @@ PHASE 1 - CORE AUTHENTICATION & SECURITY
 [ ] Add authentication attempt logging (timestamp, IP, success/failure)
 
 PHASE 2 - DATABASE LAYER (SQLite)
-[ ] Design database schema (users, characters, rooms, items, etc.)
-[ ] Create database initialization and migration system
+[X] Design database schema (users, characters, rooms, items, etc.)
+[X] Create database initialization and migration system
 [ ] Implement user registration system
 [ ] Implement password storage with bcrypt
 [ ] Implement MFA secret storage and setup flow
@@ -534,8 +608,8 @@ PHASE 2 - DATABASE LAYER (SQLite)
 
 PHASE 3 - GAME ENGINE CORE
 [ ] Design and implement command parser with abbreviations
-[ ] Implement room system with exits and descriptions
-[ ] Add zone/area management
+[X] Implement room system with exits and descriptions
+[X] Add zone/area management
 [ ] Implement player movement between rooms
 [ ] Add "look" command with detailed room descriptions
 [ ] Implement "say" and "emote" commands
@@ -545,16 +619,16 @@ PHASE 3 - GAME ENGINE CORE
 [ ] Implement game loop/ticker for periodic updates
 
 PHASE 4 - WEB CLIENT
-[ ] Create HTML/CSS/JS web client
-[ ] Implement WebSocket connection from browser
+[X] Create HTML/CSS/JS web client
+[X] Implement WebSocket connection from browser
 [ ] Add ANSI color code rendering (ansi-to-html or similar)
-[ ] Create scrolling terminal display
-[ ] Implement password input masking
-[ ] Add command history (up/down arrow navigation)
-[ ] Make mobile-friendly with touch controls
+[X] Create scrolling terminal display
+[X] Implement password input masking
+[X] Add command history (up/down arrow navigation)
+[X] Make mobile-friendly with touch controls
 [ ] Add common command buttons for mobile
-[ ] Implement graceful reconnection handling
-[ ] Add connection status indicators
+[X] Implement graceful reconnection handling
+[X] Add connection status indicators
 [ ] Implement client capability negotiation protocol
 [ ] Add status bar for HP/MP/conditions (Phase 1: text display)
 [ ] Implement JSON protocol for status updates
@@ -611,7 +685,7 @@ PHASE 9 - OPERATIONS & MONITORING
 [ ] Add structured logging (logrus or zap)
 [ ] Implement metrics collection (Prometheus)
 [ ] Add health check endpoints
-[ ] Implement graceful shutdown
+[X] Implement graceful shutdown
 [ ] Add configuration management (environment variables, config files)
 [ ] Implement hot-reload for configuration changes
 [ ] Add admin commands and web admin panel
@@ -657,7 +731,7 @@ PHASE 13 - LEGACY COMPATIBILITY (LOWEST PRIORITY)
 [ ] Test with popular MUD clients (Mudlet, TinTin++, MUSHclient)
 
 ================================================================================
-CURRENT PHASE: Phase 1 - Core Authentication & Security
-NEXT MILESTONE: Complete web client and basic room system
+CURRENT PHASE: Phase 3 - Game Engine Core
+NEXT MILESTONE: Implement player movement and look command
 ================================================================================
 */
