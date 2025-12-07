@@ -11,10 +11,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gorilla/websocket"
 	"mudengine/internal/config"
 	"mudengine/internal/database"
 	"mudengine/internal/game"
+
+	"github.com/gorilla/websocket"
 )
 
 // AuthState represents the current authentication state of a connection
@@ -36,6 +37,8 @@ type Client struct {
 	username       string
 	playerID       string
 	currentRoomID  string
+	isBuilder      bool
+	isAdmin        bool
 	failedAttempts int
 	mu             sync.Mutex
 }
@@ -87,7 +90,7 @@ func (s *Server) Run() {
 				log.Printf("Client disconnected. Total clients: %d", len(s.clients))
 			}
 			s.mu.Unlock()
-			
+
 		case <-s.shutdown:
 			log.Println("Server shutting down, closing all client connections...")
 			s.mu.Lock()
@@ -316,38 +319,61 @@ func (c *Client) handleMFA(code string) {
 
 	c.authState = StateAuthenticated
 	c.sendMessage(fmt.Sprintf("\r\nWelcome back, %s!\r\n\r\n", c.username))
-	
+
 	// Set player ID (for now, use username - later this will be from database)
 	c.playerID = c.username
-	
+
+	// Grant builder/admin privileges for testing
+	// TODO: Load these from database
+	if c.username == "admin" {
+		c.isAdmin = true
+		c.isBuilder = true
+	}
+
 	// TODO: Load player's last room from database
 	// For now, place new players in Builder Room
 	c.currentRoomID = "00000000-0000-0000-0000-000000000000"
-	
+
 	// Register player in room manager
 	if err := game.Manager.SetPlayerRoom(c.playerID, c.currentRoomID); err != nil {
 		log.Printf("Error setting player room: %v", err)
 		c.currentRoomID = "00000000-0000-0000-0000-000000000000"
 		game.Manager.SetPlayerRoom(c.playerID, c.currentRoomID)
 	}
-	
+
 	// Send initial room description
 	c.sendInitialLook()
-	
+
 	c.sendMessage("> ")
 }
 
 // handleGameCommand processes authenticated game commands
 func (c *Client) handleGameCommand(command string) {
-	switch command {
-	case "look":
-		c.sendMessage("You are in a dimly lit room. There is a door to the north.\r\n> ")
-	case "quit":
+	// Create a player object for the command system
+	player := &game.Player{
+		ID:            c.playerID,
+		Username:      c.username,
+		CurrentRoomID: c.currentRoomID,
+		IsBuilder:     c.isBuilder,
+		IsAdmin:       c.isAdmin,
+	}
+
+	// Execute the command using global registry
+	result := game.Registry.Execute(player, command)
+
+	// Update client's room if it changed
+	c.currentRoomID = player.CurrentRoomID
+
+	// Check for special quit command
+	if result == "QUIT" {
 		c.sendMessage("Goodbye!\r\n")
 		c.conn.Close()
-	default:
-		c.sendMessage(fmt.Sprintf("Unknown command: %s\r\n> ", command))
+		return
 	}
+
+	// Send the result
+	c.sendMessage(result)
+	c.sendMessage("> ")
 }
 
 // validatePassword validates the password (placeholder)
@@ -373,7 +399,7 @@ func (c *Client) sendInitialLook() {
 		log.Printf("Failed to load room %s: %v", c.currentRoomID, err)
 		return
 	}
-	
+
 	// Send room description
 	c.sendRoomDescription(room)
 }
@@ -382,17 +408,17 @@ func (c *Client) sendInitialLook() {
 func (c *Client) sendRoomDescription(room *database.Room) {
 	// Send room title
 	c.sendMessage(fmt.Sprintf("%s\r\n", room.Title))
-	
+
 	// Send description
 	c.sendMessage(fmt.Sprintf("%s\r\n\r\n", room.Description))
-	
+
 	// Get obvious exits
 	obviousExits, err := game.Manager.GetObviousExits(room.ID)
 	if err != nil {
 		log.Printf("Error getting exits: %v", err)
 		return
 	}
-	
+
 	// Format exits
 	if len(obviousExits) > 0 {
 		exitNames := make([]string, 0, len(obviousExits))
@@ -402,17 +428,17 @@ func (c *Client) sendRoomDescription(room *database.Room) {
 				exitNames = append(exitNames, exit.Keywords[0])
 			}
 		}
-		
+
 		if len(exitNames) > 0 {
 			c.sendMessage(fmt.Sprintf("Obvious exits: %s\r\n", joinStrings(exitNames, ", ")))
 		}
 	} else {
 		c.sendMessage("There are no obvious exits.\r\n")
 	}
-	
+
 	// TODO: Show objects in room
 	// TODO: Show other players/NPCs in room
-	
+
 	c.sendMessage("\r\n")
 }
 
@@ -455,29 +481,34 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
-	
+
 	// Log configuration
 	cfg.LogConfig()
-	
+
 	log.Printf("%s v%s starting up...", cfg.ServerName, cfg.ServerVersion)
-	
+
 	// Initialize database
 	if err := database.Initialize(cfg); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 	defer database.Close()
-	
+
 	// Initialize room manager
 	if err := game.InitializeRoomManager(); err != nil {
 		log.Fatalf("Failed to initialize room manager: %v", err)
 	}
-	
+
+	// Initialize command registry
+	log.Println("Initializing command registry...")
+	game.InitializeCommands()
+	log.Println("Command registry initialized")
+
 	server := NewServer()
 	go server.Run()
 
 	// HTTP handlers
 	http.HandleFunc("/ws", server.handleWebSocket)
-	
+
 	// Serve static files for web client
 	// This serves all files from web/static directory
 	// index.html will be served by default for "/"
@@ -502,7 +533,7 @@ func main() {
 		log.Printf("WebSocket endpoint: ws://localhost:%d/ws", cfg.ServerPort)
 		log.Printf("Web client: http://localhost:%d/", cfg.ServerPort)
 		log.Println("Press Ctrl+C to shutdown")
-		
+
 		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("HTTP server error: %v", err)
 		}
@@ -517,32 +548,32 @@ func main() {
 // performGracefulShutdown handles the shutdown sequence
 func performGracefulShutdown(server *Server, httpServer *http.Server, cfg *config.Config) {
 	log.Printf("%s v%s shutting down...", cfg.ServerName, cfg.ServerVersion)
-	
+
 	// Step 1: Stop accepting new connections
 	log.Println("[1/5] Stopping new connections...")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.ShutdownTimeoutSecs)*time.Second)
 	defer cancel()
-	
+
 	// Step 2: Notify all connected players
 	log.Println("[2/5] Notifying connected players...")
 	server.Shutdown() // This sends messages to clients and closes connections
-	
+
 	// Step 3: Save all player data
 	log.Println("[3/5] Saving player data...")
 	saveAllPlayerData(server)
 	time.Sleep(500 * time.Millisecond) // Simulate database writes
-	
+
 	// Step 4: Flush pending database writes
 	log.Println("[4/5] Flushing database writes...")
 	flushDatabaseWrites()
 	time.Sleep(500 * time.Millisecond) // Simulate flush
-	
+
 	// Step 5: Shutdown HTTP server
 	log.Println("[5/5] Shutting down HTTP server...")
 	if err := httpServer.Shutdown(ctx); err != nil {
 		log.Printf("HTTP server shutdown error: %v", err)
 	}
-	
+
 	log.Printf("%s v%s offline.", cfg.ServerName, cfg.ServerVersion)
 }
 
@@ -550,7 +581,7 @@ func performGracefulShutdown(server *Server, httpServer *http.Server, cfg *confi
 func saveAllPlayerData(server *Server) {
 	server.mu.RLock()
 	defer server.mu.RUnlock()
-	
+
 	playerCount := 0
 	for client := range server.clients {
 		if client.authState == StateAuthenticated {
@@ -560,7 +591,7 @@ func saveAllPlayerData(server *Server) {
 			playerCount++
 		}
 	}
-	
+
 	if playerCount > 0 {
 		log.Printf("  Saved %d player(s)", playerCount)
 	} else {

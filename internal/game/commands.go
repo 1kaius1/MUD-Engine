@@ -5,6 +5,7 @@ package game
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"mudengine/internal/database"
@@ -34,6 +35,7 @@ var Registry *CommandRegistry
 // This must be called once at server startup
 func InitializeCommands() {
 	Registry = NewCommandRegistry()
+	log.Printf("Command registry initialized with %d commands", len(Registry.commands))
 }
 
 // NewCommandRegistry creates a new command registry
@@ -100,8 +102,11 @@ func (cr *CommandRegistry) Execute(player *Player, input string) string {
 	cmdName := strings.ToLower(parts[0])
 	args := parts[1:]
 	
+	log.Printf("Executing command: '%s' with args: %v", cmdName, args)
+	
 	handler, exists := cr.commands[cmdName]
 	if !exists {
+		log.Printf("Command not found: '%s'", cmdName)
 		return fmt.Sprintf("Unknown command: %s\r\n", cmdName)
 	}
 	
