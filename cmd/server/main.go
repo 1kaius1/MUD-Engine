@@ -326,11 +326,11 @@ func (c *Client) handleMFA(code string) {
 	// Grant builder/admin privileges for testing
 	// TODO: Load these from database
 	if c.username == "admin" {
-		c.keys["admin"] = true
-		c.keys["builder"] = true
-		c.keys["moderator"] = true
-		c.keys["storyteller"] = true
-		log.Printf("Granted keys to %s: admin, builder, moderator, storyteller", c.username)
+		c.keys["Admin"] = true
+		c.keys["Builder"] = true
+		c.keys["Moderator"] = true
+		c.keys["Storyteller"] = true
+		log.Printf("Granted keys to %s: Admin, Builder, Moderator, Storyteller", c.username)
 	}
 
 	// TODO: Load player's last room from database
