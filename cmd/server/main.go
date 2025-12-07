@@ -118,6 +118,7 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn:      conn,
 		send:      make(chan []byte, 256),
 		authState: StateConnected,
+		keys:      make(map[string]bool),
 	}
 
 	s.register <- client
@@ -325,8 +326,11 @@ func (c *Client) handleMFA(code string) {
 	// Grant builder/admin privileges for testing
 	// TODO: Load these from database
 	if c.username == "admin" {
-		c.isAdmin = true
-		c.isBuilder = true
+		c.keys["admin"] = true
+		c.keys["builder"] = true
+		c.keys["moderator"] = true
+		c.keys["storyteller"] = true
+		log.Printf("Granted keys to %s: admin, builder, moderator, storyteller", c.username)
 	}
 
 	// TODO: Load player's last room from database
@@ -353,8 +357,7 @@ func (c *Client) handleGameCommand(command string) {
 		ID:            c.playerID,
 		Username:      c.username,
 		CurrentRoomID: c.currentRoomID,
-		IsBuilder:     c.isBuilder,
-		IsAdmin:       c.isAdmin,
+		Keys:          c.keys,
 	}
 
 	// Execute the command using global registry
