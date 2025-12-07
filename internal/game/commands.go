@@ -1,5 +1,20 @@
 // File: internal/game/commands.go
 // MUD Engine - Command System
+//
+// Lock/Key Authorization System:
+// Commands have "locks" that require specific "keys" to access.
+// Players possess "keys" which are granted based on their role/permissions.
+// 
+// Standard Keys:
+//   admin       - Full administrative access
+//   builder     - Can create/edit rooms, exits, zones
+//   moderator   - Can kick/ban players, moderate chat
+//   storyteller - Can run events, control NPCs, spawn items
+//
+// Usage in commands:
+//   if !player.HasKey("builder") { return "Permission denied" }
+//   if player.HasAllKeys("admin", "builder") { ... }
+//   if player.HasAnyKey("moderator", "admin") { ... }
 
 package game
 
@@ -19,8 +34,35 @@ type Player struct {
 	ID            string
 	Username      string
 	CurrentRoomID string
-	IsBuilder     bool
-	IsAdmin       bool
+	Keys          map[string]bool // Keys the player possesses (keyAdmin, keyBuilder, etc.)
+}
+
+// HasKey checks if the player possesses a specific key
+func (p *Player) HasKey(keyName string) bool {
+	if p.Keys == nil {
+		return false
+	}
+	return p.Keys[keyName]
+}
+
+// HasAllKeys checks if the player possesses all specified keys
+func (p *Player) HasAllKeys(keyNames ...string) bool {
+	for _, key := range keyNames {
+		if !p.HasKey(key) {
+			return false
+		}
+	}
+	return true
+}
+
+// HasAnyKey checks if the player possesses at least one of the specified keys
+func (p *Player) HasAnyKey(keyNames ...string) bool {
+	for _, key := range keyNames {
+		if p.HasKey(key) {
+			return true
+		}
+	}
+	return false
 }
 
 // CommandRegistry holds all available commands
@@ -199,8 +241,8 @@ func CmdSay(player *Player, args []string) string {
 
 // CmdTeleport teleports a builder/admin to a room
 func CmdTeleport(player *Player, args []string) string {
-	// Check permissions
-	if !player.IsBuilder && !player.IsAdmin {
+	// Check permissions - requires keyBuilder
+	if !player.HasKey("keyBuilder") {
 		return "You don't have permission to use this command.\r\n"
 	}
 	
@@ -237,7 +279,7 @@ func CmdTeleport(player *Player, args []string) string {
 
 // CmdListRooms lists all rooms (builder command)
 func CmdListRooms(player *Player, args []string) string {
-	if !player.IsBuilder && !player.IsAdmin {
+	if !player.HasKey("keyBuilder") {
 		return "You don't have permission to use this command.\r\n"
 	}
 	
@@ -286,7 +328,7 @@ func CmdListRooms(player *Player, args []string) string {
 
 // CmdListZones lists all zones (builder command)
 func CmdListZones(player *Player, args []string) string {
-	if !player.IsBuilder && !player.IsAdmin {
+	if !player.HasKey("keyBuilder") {
 		return "You don't have permission to use this command.\r\n"
 	}
 	
@@ -370,7 +412,7 @@ func FormatRoomDescription(room *database.Room) string {
 
 // CmdRoom handles room building commands
 func CmdRoom(player *Player, args []string) string {
-	if !player.IsBuilder && !player.IsAdmin {
+	if !player.HasKey("keyBuilder") {
 		return "You don't have permission to use this command.\r\n"
 	}
 	
@@ -548,7 +590,7 @@ func CmdRoomDelete(player *Player, args []string) string {
 
 // CmdExit handles exit building commands
 func CmdExit(player *Player, args []string) string {
-	if !player.IsBuilder && !player.IsAdmin {
+	if !player.HasKey("keyBuilder") {
 		return "You don't have permission to use this command.\r\n"
 	}
 	
@@ -677,7 +719,7 @@ func CmdExitList(player *Player, args []string) string {
 
 // CmdZone handles zone commands
 func CmdZone(player *Player, args []string) string {
-	if !player.IsBuilder && !player.IsAdmin {
+	if !player.HasKey("keyBuilder") {
 		return "You don't have permission to use this command.\r\n"
 	}
 	

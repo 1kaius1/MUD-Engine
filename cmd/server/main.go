@@ -37,8 +37,7 @@ type Client struct {
 	username       string
 	playerID       string
 	currentRoomID  string
-	isBuilder      bool
-	isAdmin        bool
+	keys           map[string]bool // Authorization keys (Admin, Builder, Storyteller, etc.)
 	failedAttempts int
 	mu             sync.Mutex
 }
