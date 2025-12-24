@@ -18,6 +18,7 @@ type Config struct {
 	// Server settings
 	ServerName    string
 	ServerVersion string
+	ServerHost    string // Host/IP to bind to (empty string = all interfaces, "localhost" = local only)
 	ServerPort    int
 	
 	// Database settings
@@ -52,6 +53,7 @@ type Config struct {
 var defaultConfig = Config{
 	ServerName:           "MUD Engine",
 	ServerVersion:        "0.1.0",
+	ServerHost:           "", // Empty = bind to all interfaces (0.0.0.0)
 	ServerPort:           8080,
 	DBType:               "sqlite",
 	DBHost:               "localhost",
@@ -158,6 +160,8 @@ func setConfigValue(config *Config, key, value string) error {
 		config.ServerName = value
 	case "SERVER_VERSION":
 		config.ServerVersion = value
+	case "SERVER_HOST":
+		config.ServerHost = value
 	case "SERVER_PORT":
 		port, err := strconv.Atoi(value)
 		if err != nil {
@@ -266,6 +270,13 @@ func createDefaultEnvFile(filename string) error {
 # ==============================================================================
 SERVER_NAME=MUD Engine
 SERVER_VERSION=0.1.0
+
+# Host/IP to bind to:
+#   (empty)      = Bind to all interfaces (0.0.0.0) - accessible from network
+#   localhost    = Bind to localhost only (127.0.0.1) - local connections only
+#   192.168.1.10 = Bind to specific IP address
+SERVER_HOST=
+
 SERVER_PORT=8080
 
 # ==============================================================================
@@ -364,11 +375,24 @@ func (c *Config) GetConnectionString() string {
 	}
 }
 
+// GetBindAddress returns the address to bind the server to
+func (c *Config) GetBindAddress() string {
+	if c.ServerHost == "" {
+		return "0.0.0.0" // All interfaces
+	}
+	return c.ServerHost
+}
+
+// GetListenAddress returns the full listen address (host:port)
+func (c *Config) GetListenAddress() string {
+	return fmt.Sprintf("%s:%d", c.GetBindAddress(), c.ServerPort)
+}
+
 // LogConfig logs the current configuration (without sensitive data)
 func (c *Config) LogConfig() {
 	log.Println("=== Server Configuration ===")
 	log.Printf("Server: %s v%s", c.ServerName, c.ServerVersion)
-	log.Printf("Port: %d", c.ServerPort)
+	log.Printf("Bind Address: %s:%d", c.GetBindAddress(), c.ServerPort)
 	log.Printf("Database Type: %s", c.DBType)
 	if c.DBType == "sqlite" {
 		log.Printf("Database File: %s", c.DBName)
@@ -381,3 +405,4 @@ func (c *Config) LogConfig() {
 	log.Printf("TLS: %v", c.TLSEnabled)
 	log.Println("===========================")
 }
+
