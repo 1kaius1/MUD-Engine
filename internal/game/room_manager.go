@@ -24,17 +24,17 @@ var Manager *RoomManager
 // InitializeRoomManager creates and initializes the room manager
 func InitializeRoomManager() error {
 	log.Println("Initializing room manager...")
-	
+
 	Manager = &RoomManager{
 		rooms:       make(map[string]*database.Room),
 		playerRooms: make(map[string]string),
 	}
-	
+
 	// Load all rooms into memory
 	if err := Manager.LoadAllRooms(); err != nil {
 		return fmt.Errorf("failed to load rooms: %w", err)
 	}
-	
+
 	log.Printf("Room manager initialized with %d rooms", len(Manager.rooms))
 	return nil
 }
@@ -45,10 +45,10 @@ func (rm *RoomManager) LoadAllRooms() error {
 	if err != nil {
 		return err
 	}
-	
+
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	
+
 	for _, room := range rooms {
 		// Load exits for each room
 		exits, err := database.GetExitsByRoom(room.ID)
@@ -57,10 +57,10 @@ func (rm *RoomManager) LoadAllRooms() error {
 			continue
 		}
 		room.Exits = exits
-		
+
 		rm.rooms[room.ID] = room
 	}
-	
+
 	return nil
 }
 
@@ -73,18 +73,18 @@ func (rm *RoomManager) LoadRoom(roomID string) (*database.Room, error) {
 		return room, nil
 	}
 	rm.mu.RUnlock()
-	
+
 	// Load from database
 	room, err := database.GetRoom(roomID)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Cache it
 	rm.mu.Lock()
 	rm.rooms[roomID] = room
 	rm.mu.Unlock()
-	
+
 	return room, nil
 }
 
@@ -93,11 +93,11 @@ func (rm *RoomManager) GetRoom(roomID string) (*database.Room, error) {
 	rm.mu.RLock()
 	room, exists := rm.rooms[roomID]
 	rm.mu.RUnlock()
-	
+
 	if !exists {
 		return rm.LoadRoom(roomID)
 	}
-	
+
 	return room, nil
 }
 
@@ -105,12 +105,12 @@ func (rm *RoomManager) GetRoom(roomID string) (*database.Room, error) {
 func (rm *RoomManager) GetPlayerRoom(playerID string) (string, error) {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
-	
+
 	roomID, exists := rm.playerRooms[playerID]
 	if !exists {
 		return "", fmt.Errorf("player location not set: %s", playerID)
 	}
-	
+
 	return roomID, nil
 }
 
@@ -120,10 +120,10 @@ func (rm *RoomManager) SetPlayerRoom(playerID, roomID string) error {
 	if _, err := rm.GetRoom(roomID); err != nil {
 		return fmt.Errorf("room does not exist: %s", roomID)
 	}
-	
+
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	
+
 	rm.playerRooms[playerID] = roomID
 	return nil
 }
@@ -134,13 +134,13 @@ func (rm *RoomManager) MovePlayer(playerID, fromRoomID, toRoomID string) error {
 	if _, err := rm.GetRoom(toRoomID); err != nil {
 		return fmt.Errorf("destination room does not exist: %s", toRoomID)
 	}
-	
+
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	
+
 	// Update player location
 	rm.playerRooms[playerID] = toRoomID
-	
+
 	return nil
 }
 
@@ -148,14 +148,14 @@ func (rm *RoomManager) MovePlayer(playerID, fromRoomID, toRoomID string) error {
 func (rm *RoomManager) GetPlayersInRoom(roomID string) []string {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
-	
+
 	var players []string
 	for playerID, playerRoomID := range rm.playerRooms {
 		if playerRoomID == roomID {
 			players = append(players, playerID)
 		}
 	}
-	
+
 	return players
 }
 
@@ -163,7 +163,7 @@ func (rm *RoomManager) GetPlayersInRoom(roomID string) []string {
 func (rm *RoomManager) RemovePlayer(playerID string) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
-	
+
 	delete(rm.playerRooms, playerID)
 }
 
@@ -173,7 +173,7 @@ func (rm *RoomManager) FindExitByKeyword(roomID, keyword string) (*database.Exit
 	if err != nil {
 		return nil, err
 	}
-	
+
 	for _, exit := range room.Exits {
 		for _, kw := range exit.Keywords {
 			if kw == keyword {
@@ -181,7 +181,7 @@ func (rm *RoomManager) FindExitByKeyword(roomID, keyword string) (*database.Exit
 			}
 		}
 	}
-	
+
 	return nil, fmt.Errorf("no exit found with keyword: %s", keyword)
 }
 
@@ -191,14 +191,14 @@ func (rm *RoomManager) GetObviousExits(roomID string) ([]*database.Exit, error) 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var obvious []*database.Exit
 	for _, exit := range room.Exits {
 		if !exit.IsHidden && exit.IsObvious {
 			obvious = append(obvious, exit)
 		}
 	}
-	
+
 	return obvious, nil
 }
 
@@ -208,7 +208,7 @@ func (rm *RoomManager) GetAllExits(roomID string) ([]*database.Exit, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return room.Exits, nil
 }
 
@@ -219,11 +219,11 @@ func (rm *RoomManager) ReloadRoom(roomID string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	rm.mu.Lock()
 	rm.rooms[roomID] = room
 	rm.mu.Unlock()
-	
+
 	log.Printf("Reloaded room: %s", roomID)
 	return nil
 }
@@ -234,12 +234,12 @@ func (rm *RoomManager) CreateAndCacheRoom(room *database.Room) error {
 	if err := database.CreateRoom(room); err != nil {
 		return err
 	}
-	
+
 	// Add to cache
 	rm.mu.Lock()
 	rm.rooms[room.ID] = room
 	rm.mu.Unlock()
-	
+
 	log.Printf("Created and cached room: %s", room.Title)
 	return nil
 }
@@ -248,7 +248,7 @@ func (rm *RoomManager) CreateAndCacheRoom(room *database.Room) error {
 func (rm *RoomManager) GetRoomCount() int {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
-	
+
 	return len(rm.rooms)
 }
 
@@ -256,17 +256,17 @@ func (rm *RoomManager) GetRoomCount() int {
 func (rm *RoomManager) GetPlayerCount() int {
 	rm.mu.RLock()
 	defer rm.mu.RUnlock()
-	
+
 	return len(rm.playerRooms)
 }
 
 // GetRoomStats returns statistics about a room
 type RoomStats struct {
-	RoomID       string
-	Title        string
-	PlayerCount  int
-	ExitCount    int
-	Darkness     int
+	RoomID      string
+	Title       string
+	PlayerCount int
+	ExitCount   int
+	Darkness    int
 }
 
 func (rm *RoomManager) GetRoomStats(roomID string) (*RoomStats, error) {
@@ -274,7 +274,7 @@ func (rm *RoomManager) GetRoomStats(roomID string) (*RoomStats, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	stats := &RoomStats{
 		RoomID:      room.ID,
 		Title:       room.Title,
@@ -282,6 +282,6 @@ func (rm *RoomManager) GetRoomStats(roomID string) (*RoomStats, error) {
 		ExitCount:   len(room.Exits),
 		Darkness:    room.Darkness,
 	}
-	
+
 	return stats, nil
 }
