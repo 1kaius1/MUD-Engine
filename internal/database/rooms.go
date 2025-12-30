@@ -57,7 +57,11 @@ type Exit struct {
 	AllowLookThrough bool     `json:"allow_look_through"`
 	IsOpen           bool     `json:"is_open"`
 	IsLocked         bool     `json:"is_locked"`
-	RequiresItemID   *string  `json:"requires_item_id,omitempty"`
+
+	// Lock/Key System: Uses named locks like "brass_key" or "ornate_door_key"
+	// Entity must possess an item with matching name to unlock
+	// Examples: "brass_key", "castle_gate_key", "master_key"
+	LockName *string `json:"lock_name,omitempty"`
 }
 
 // Zone represents a grouping of rooms
@@ -285,7 +289,7 @@ func CreateExit(exit *Exit) error {
 		exit.ID = uuid.New().String()
 	}
 
-	// Marshal keywords to JSON
+	// Marshal keywords to JSON array for database storage
 	keywordsJSON, err := json.Marshal(exit.Keywords)
 	if err != nil {
 		return fmt.Errorf("failed to marshal keywords: %w", err)
@@ -295,14 +299,14 @@ func CreateExit(exit *Exit) error {
 		INSERT INTO exits (
 			id, from_room_id, to_room_id, keywords, description,
 			is_hidden, is_obvious, allow_look_through, is_open, is_locked,
-			requires_item_id
+			lock_name
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	_, err = DB.Exec(query,
 		exit.ID, exit.FromRoomID, exit.ToRoomID, string(keywordsJSON), exit.Description,
 		exit.IsHidden, exit.IsObvious, exit.AllowLookThrough, exit.IsOpen, exit.IsLocked,
-		exit.RequiresItemID,
+		exit.LockName,
 	)
 
 	if err != nil {
@@ -318,7 +322,7 @@ func GetExitsByRoom(roomID string) ([]*Exit, error) {
 		SELECT 
 			id, from_room_id, to_room_id, keywords, description,
 			is_hidden, is_obvious, allow_look_through, is_open, is_locked,
-			requires_item_id
+			lock_name
 		FROM exits
 		WHERE from_room_id = ?
 	`
@@ -333,25 +337,25 @@ func GetExitsByRoom(roomID string) ([]*Exit, error) {
 	for rows.Next() {
 		exit := &Exit{}
 		var keywordsJSON string
-		var requiresItemID sql.NullString
+		var lockName sql.NullString
 
 		err := rows.Scan(
 			&exit.ID, &exit.FromRoomID, &exit.ToRoomID, &keywordsJSON, &exit.Description,
 			&exit.IsHidden, &exit.IsObvious, &exit.AllowLookThrough, &exit.IsOpen, &exit.IsLocked,
-			&requiresItemID,
+			&lockName,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan exit: %w", err)
 		}
 
-		// Unmarshal keywords
+		// Unmarshal keywords from JSON array
 		if err := json.Unmarshal([]byte(keywordsJSON), &exit.Keywords); err != nil {
 			return nil, fmt.Errorf("failed to unmarshal keywords: %w", err)
 		}
 
-		// Handle nullable requires_item_id
-		if requiresItemID.Valid {
-			exit.RequiresItemID = &requiresItemID.String
+		// Handle nullable lock_name field
+		if lockName.Valid {
+			exit.LockName = &lockName.String
 		}
 
 		exits = append(exits, exit)

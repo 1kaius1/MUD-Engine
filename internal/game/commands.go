@@ -34,7 +34,7 @@ type Player struct {
 	ID            string
 	Username      string
 	CurrentRoomID string
-	Keys          map[string]bool // Keys the player possesses (Admin, Builder, etc.)
+	Keys          map[string]bool // Keys the player possesses (Admin, Builder, racial traits, items, etc.)
 }
 
 // HasKey checks if the player possesses a specific key
@@ -63,6 +63,37 @@ func (p *Player) HasAnyKey(keyNames ...string) bool {
 		}
 	}
 	return false
+}
+
+// GrantKey gives a key to the player
+// Used for: racial traits, class abilities, item equips, quest rewards, etc.
+func (p *Player) GrantKey(keyName string) {
+	if p.Keys == nil {
+		p.Keys = make(map[string]bool)
+	}
+	p.Keys[keyName] = true
+}
+
+// RevokeKey removes a key from the player
+// Used for: item unequips, curse removal, permission loss, etc.
+func (p *Player) RevokeKey(keyName string) {
+	if p.Keys != nil {
+		delete(p.Keys, keyName)
+	}
+}
+
+// ListKeys returns all keys the player currently possesses
+// Useful for debugging, character sheets, and admin commands
+func (p *Player) ListKeys() []string {
+	if p.Keys == nil {
+		return []string{}
+	}
+
+	keys := make([]string, 0, len(p.Keys))
+	for key := range p.Keys {
+		keys = append(keys, key)
+	}
+	return keys
 }
 
 // CommandRegistry holds all available commands
@@ -125,6 +156,11 @@ func NewCommandRegistry() *CommandRegistry {
 	registry.Register("exit", CmdExit)
 	registry.Register("zone", CmdZone)
 
+	// Register key management commands
+	registry.Register("keys", CmdKeys)
+	registry.Register("grant", CmdGrantKey)
+	registry.Register("revoke", CmdRevokeKey)
+
 	return registry
 }
 
@@ -177,25 +213,29 @@ func CmdMove(player *Player, args []string) string {
 
 // MovePlayer handles player movement
 func MovePlayer(player *Player, direction string) string {
-	// Find exit by keyword
+	// Find exit by keyword (e.g., "north", "door", "gate")
 	exit, err := Manager.FindExitByKeyword(player.CurrentRoomID, direction)
 	if err != nil {
 		return fmt.Sprintf("You can't go %s.\r\n", direction)
 	}
 
-	// Check if exit is locked
+	// Check if exit is locked (physical lock that blocks passage)
 	if exit.IsLocked {
 		return "That way is locked.\r\n"
 	}
 
-	// Check if exit is open
+	// Check if exit is open (doors can be closed but unlocked)
 	if !exit.IsOpen {
 		return "That way is closed.\r\n"
 	}
 
-	// TODO: Check if player has required item (key)
-	if exit.RequiresItemID != nil {
-		return "You need a key to go that way.\r\n"
+	// Check if exit requires a key/credential
+	// This is the authorization layer - works for physical keys, racial traits,
+	// magical permissions, faction access, etc.
+	if exit.LockName != nil && *exit.LockName != "" {
+		if !player.HasKey(*exit.LockName) {
+			return "You cannot pass through here.\r\n"
+		}
 	}
 
 	// Move the player
@@ -789,4 +829,68 @@ func expandDirection(dir string) []string {
 	default:
 		return []string{dir}
 	}
+}
+
+// CmdKeys lists all keys the player currently possesses
+func CmdKeys(player *Player, args []string) string {
+	keys := player.ListKeys()
+
+	if len(keys) == 0 {
+		return "You don't possess any keys or credentials.\r\n"
+	}
+
+	result := "Keys and credentials you possess:\r\n"
+	for _, key := range keys {
+		result += fmt.Sprintf("  - %s\r\n", key)
+	}
+
+	return result
+}
+
+// CmdGrantKey grants a key to the current player or another player
+// Admin only command for testing and special events
+func CmdGrantKey(player *Player, args []string) string {
+	// Check admin permission
+	if !player.HasKey("Admin") {
+		return "You don't have permission to use this command.\r\n"
+	}
+
+	if len(args) == 0 {
+		return "Usage: grant <key_name>\r\n" +
+			"Example: grant Dwarven_Lineage\r\n" +
+			"Example: grant wizard_ring\r\n"
+	}
+
+	keyName := strings.Join(args, "_")
+
+	// Grant the key
+	player.GrantKey(keyName)
+
+	return fmt.Sprintf("Granted key: %s\r\n", keyName)
+}
+
+// CmdRevokeKey removes a key from the current player or another player
+// Admin only command for testing and special events
+func CmdRevokeKey(player *Player, args []string) string {
+	// Check admin permission
+	if !player.HasKey("Admin") {
+		return "You don't have permission to use this command.\r\n"
+	}
+
+	if len(args) == 0 {
+		return "Usage: revoke <key_name>\r\n" +
+			"Example: revoke Dwarven_Lineage\r\n"
+	}
+
+	keyName := strings.Join(args, "_")
+
+	// Check if player has the key
+	if !player.HasKey(keyName) {
+		return fmt.Sprintf("You don't possess the key: %s\r\n", keyName)
+	}
+
+	// Revoke the key
+	player.RevokeKey(keyName)
+
+	return fmt.Sprintf("Revoked key: %s\r\n", keyName)
 }
